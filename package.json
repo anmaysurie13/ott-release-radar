@@ -1,0 +1,25 @@
+{
+  "name": "ott-release-radar",
+  "private": true,
+  "type": "module",
+  "description": "Personalised India OTT 'New This Week' dashboard + Friday Telegram digest (Supabase, TMDB, Gemini, Telegram).",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck:functions": "npx -y deno@2 check --node-modules-dir=none supabase/functions/radar-cron/index.ts supabase/functions/radar-api/index.ts",
+    "feasibility": "node scripts/feasibility.mjs",
+    "smoke:live": "node scripts/live-smoke.mjs",
+    "web:dev": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run build",
+    "diagram": "node scripts/render-diagram.mjs"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "@supabase/supabase-js": "^2.117.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=20.12"
+  }
+}

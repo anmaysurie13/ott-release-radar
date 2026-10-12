@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/panels.tsx","./src/components/releasecard.tsx","./src/lib/fixtures.ts","./src/lib/format.ts","./src/lib/supabase.ts","./src/lib/types.ts"],"version":"5.9.3"}
