@@ -3,7 +3,7 @@
 A personalised dashboard and Friday Telegram digest of **verified** new releases on **Netflix, Prime Video and JioHotstar in India**. It's built for one viewer (Naman: Thriller, Sci-Fi, Indie Drama; Hindi, English, Tamil).
 
 - **Dashboard (public, read-only — no sign-in; edits need the owner code from `.env` `OWNER_CODE`):** https://ott-release-radar-six.vercel.app
-- **Digest:** every Friday 18:30 IST via Telegram. Scheduled sends are **off** (`LIVE_SEND_ENABLED=false`) until the owner approves.
+- **Digest:** every Friday 18:30 IST via Telegram (live since 12 Oct 2026; extra one-off digests 12 & 13 Oct).
 - **Docs:** [component map](docs/component-map.md) · [nine checks](docs/nine-checks.md) · [source feasibility](docs/feasibility.md)
 
 > Facts and AI opinions are kept apart. Availability, dates, languages and plot come only from verified sources (TMDB/JustWatch, Streaming Availability, our India snapshot diff, or a human review). Gemini only adds a labelled Watch/Maybe/Skip opinion. News articles are used to discover titles and **never** confirm a release.
