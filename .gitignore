@@ -17,3 +17,4 @@ supabase/.branches/
 scripts/out/
 *.log
 .DS_Store
+.vercel
