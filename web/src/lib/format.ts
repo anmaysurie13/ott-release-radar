@@ -22,8 +22,17 @@ export const langName = (c: string | null) => (c ? LANG[c] ?? c.toUpperCase() : 
 export function istDate(d: Date): string { return new Date(d.getTime() + IST).toISOString().slice(0, 10); }
 export function istMidnight(ymd: string): Date { return new Date(Date.parse(`${ymd}T00:00:00Z`) - IST); }
 
-/** Next Friday 18:30 IST strictly after now. */
+/** Owner-requested one-off extra digests (18:30 IST), in addition to the weekly Friday send. */
+const EXTRA_DIGEST_DATES = ["2026-10-12", "2026-10-13"];
+
+/** Next digest (one-off extra or Friday 18:30 IST) strictly after now. */
 export function nextDigest(now = new Date()): Date {
+  const extra = EXTRA_DIGEST_DATES.map((d) => new Date(Date.parse(`${d}T13:00:00Z`))).filter((d) => d > now);
+  const weekly = nextFriday(now);
+  return extra.length && extra[0] < weekly ? extra[0] : weekly;
+}
+
+function nextFriday(now: Date): Date {
   const s = new Date(now.getTime() + IST);
   const back = (s.getUTCDay() - 5 + 7) % 7;
   let b = Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate() - back, 18, 30) - IST;
@@ -61,7 +70,7 @@ export function episodes(r: Pick<Release, "media_type" | "season_number" | "epis
     const n = r.episode_count ?? 1;
     return n > 1 ? `${s} · E${r.episode_number}–${r.episode_number + n - 1}` : `${s} · E${r.episode_number}`;
   }
-  return r.episode_count ? `${s} · ${r.episode_count} episodes` : s || null;
+  return r.episode_count ? `${s} · ${r.episode_count} episode${r.episode_count === 1 ? "" : "s"}` : s || null;
 }
 
 export function availableAt(r: Pick<Release, "available_at" | "available_date">): number | null {

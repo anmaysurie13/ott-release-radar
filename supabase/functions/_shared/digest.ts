@@ -20,6 +20,8 @@ export interface DigestRelease {
   runtime_min: number | null;
   watch_link: string | null;
   evidence_url: string | null;
+  /** true = not in an earlier sent digest (only set when an earlier digest overlaps this window) */
+  is_new?: boolean;
   rec: { verdict: Verdict; score: number; reason: string; synopsis: string; is_fallback: boolean } | null;
 }
 
@@ -52,12 +54,12 @@ export function formatEpisodes(r: Pick<DigestRelease, "media_type" | "season_num
     const n = r.episode_count ?? 1;
     return n > 1 ? `${s} E${r.episode_number}–E${r.episode_number + n - 1}` : `${s} E${r.episode_number}`;
   }
-  return r.episode_count ? `${s} · ${r.episode_count} episodes`.replace(/^ · /, "") : s || null;
+  return r.episode_count ? `${s} · ${r.episode_count} episode${r.episode_count === 1 ? "" : "s"}`.replace(/^ · /, "") : s || null;
 }
 
 function itemBlock(r: DigestRelease, n: number): string {
   const e = escapeHtml;
-  const head = `<b>${n}. ${e(r.title)}</b>${r.year ? ` (${r.year})` : ""} · ${PROVIDER_LABEL[r.provider]}`;
+  const head = `${r.is_new ? "🆕 " : ""}<b>${n}. ${e(r.title)}</b>${r.year ? ` (${r.year})` : ""} · ${PROVIDER_LABEL[r.provider]}`;
   const when = `📅 ${shortDate(r.available_date)} — ${BASIS_LABEL[r.date_basis]} · ${RELEASE_LABEL[r.release_type]}`;
   const meta = [r.genres.slice(0, 3).join(", "), r.original_language ? (LANG[r.original_language] ?? r.original_language) : null,
     formatEpisodes(r) ?? formatRuntime(r.runtime_min)].filter(Boolean).join(" · ");
@@ -100,6 +102,7 @@ export function groupEpisodes(items: DigestRelease[]): DigestRelease[] {
       episode_number: null,
       episode_count: g.reduce((n, x) => n + (x.episode_count ?? 1), 0),
       rec: g.find((x) => x.rec)?.rec ?? null,
+      is_new: g.some((x) => x.is_new) || (g.every((x) => x.is_new === undefined) ? undefined : false),
     });
   }
   return out;

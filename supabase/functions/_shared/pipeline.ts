@@ -179,7 +179,7 @@ export async function runCollect(ctx: Ctx, w: TimeWindow, trigger: string, task 
       timed("news", () => discoverNews({ since: newsSince, fetchImpl: ctx.fetchImpl })),
     ]);
 
-    health.streaming_availability = sa.status === "ok" ? `ok (${sa.changes.length} changes, ${sa.requests} req)` : `${sa.status}: ${sa.reason}`;
+    health.streaming_availability = sa.status === "ok" ? `ok (${sa.changes.length} changes, ${sa.requests} req${sa.reason ? `; ${sa.reason}` : ""})` : `${sa.status}: ${sa.reason}`;
     stats.sa_changes = sa.changes.length;
     for (const c of sa.changes) {
       let key = parseTmdbKey(c.tmdb_key);
@@ -254,7 +254,7 @@ export async function runCollect(ctx: Ctx, w: TimeWindow, trigger: string, task 
     // 3. Facts + verification per title
     stats.titles_considered = titles.size;
     const verified: { rows: VerifiedRelease[]; facts: TitleFacts }[] = [];
-    await timed("verify", () => mapLimit([...titles.values()], 8, async (b) => {
+    await timed("verify", () => mapLimit([...titles.values()], 12, async (b) => {
       if (timeLeft(ctx) < 30_000) { partial = true; return; }
       try {
         const detail: any = await tmdb.titleFacts(b.media_type, b.tmdb_id);
@@ -304,7 +304,7 @@ const STATUS_RANK: Record<string, number> = { confirmed: 3, needs_review: 2, exc
 
 async function saveReleases(ctx: Ctx, verified: { rows: VerifiedRelease[]; facts: TitleFacts }[]) {
   let inserted = 0, updated = 0, evidence = 0, confirmed = 0, review = 0, excluded = 0;
-  await mapLimit(verified, 6, async ({ rows, facts }) => {
+  await mapLimit(verified, 14, async ({ rows, facts }) => {
     const existing = must(await ctx.db.from("releases").select("id, media_type, tmdb_id, provider, release_type, season_number, episode_number, available_date, verification_status, date_basis, reviewed_at, confidence")
       .eq("media_type", facts.media_type).eq("tmdb_id", facts.tmdb_id), "load existing") as any[];
     for (const r of rows) {
@@ -318,6 +318,7 @@ async function saveReleases(ctx: Ctx, verified: { rows: VerifiedRelease[]; facts
       const match = existing.find((e) => identityKey(e) === identityKey(r) &&
         (!e.available_date || !r.available_date || Math.abs(daysBetween(e.available_date, r.available_date)) <= SAME_EVENT_DAYS));
       let id: string;
+      let isNew = false;
       if (match) {
         id = match.id;
         const humanLocked = !!match.reviewed_at;
@@ -342,14 +343,19 @@ async function saveReleases(ctx: Ctx, verified: { rows: VerifiedRelease[]; facts
         id = ins.id;
         existing.push({ ...r, id, confidence: r.confidence });
         inserted++;
+        isNew = true;
       }
-      const have = must(await ctx.db.from("release_evidence").select("evidence_type, source_id, stated_date").eq("release_id", id), "load evidence") as any[];
+      // brand-new rows have no evidence yet → skip the lookup (saves a round trip per release)
+      const have = isNew ? [] : must(await ctx.db.from("release_evidence").select("evidence_type, source_id, stated_date").eq("release_id", id), "load evidence") as any[];
       const k = (e: any) => `${e.evidence_type}|${e.source_id ?? ""}|${e.stated_date ?? ""}`;
       const seen = new Set(have.map(k));
       const fresh = r.evidence.filter((e) => { const kk = k(e); if (seen.has(kk)) return false; seen.add(kk); return true; })
         .map((e) => ({ release_id: id, evidence_type: e.evidence_type, stance: e.stance, source_id: e.source_id ?? null, url: e.url ?? null,
           stated_date: e.stated_date ?? null, stated_platform: e.stated_platform ?? null, quote: e.quote ?? null, detail: e.detail ?? {} }));
-      if (fresh.length) { must(await ctx.db.from("release_evidence").insert(fresh), "insert evidence"); evidence += fresh.length; }
+      if (fresh.length) {
+        const ins = await ctx.db.from("release_evidence").insert(fresh);
+        if (!ins.error) evidence += fresh.length; // a duplicate (unique index) is harmless; never fail the run for it
+      }
     }
   });
   return { releases_inserted: inserted, releases_updated: updated, evidence_added: evidence, confirmed, needs_review: review, excluded };
@@ -362,10 +368,13 @@ export function releaseInWindow(r: { available_at: string | null; available_date
   return !!r.available_date && dateInWindow(r.available_date, w);
 }
 
-/** Hard language filter: TMDB original/spoken language must be one of the saved languages (dubs are not exposed by TMDB, so not assumed). */
-export function matchesLanguage(r: { original_language?: string | null; spoken_languages?: string[] | null }, languages: string[]): boolean {
+/**
+ * Hard language filter on TMDB's ORIGINAL language (e.g. a Polish film that merely lists English among spoken languages
+ * does not count). Dubs/audio tracks are not exposed by TMDB, so they are never assumed.
+ */
+export function matchesLanguage(r: { original_language?: string | null }, languages: string[]): boolean {
   if (!languages.length) return true;
-  return [r.original_language, ...(r.spoken_languages ?? [])].some((l) => !!l && languages.includes(l));
+  return !!r.original_language && languages.includes(r.original_language);
 }
 
 export function passesPreferences(r: any, prefs: Preferences): boolean {
@@ -427,6 +436,14 @@ export async function buildDigest(ctx: Ctx, w: TimeWindow, isTest: boolean, degr
   await ensureRecommendations(ctx, w, prefs);
   const rows = (await windowReleases(ctx, w)).filter((r) => passesPreferences(r, prefs));
   const reviewRows = (await windowReleases(ctx, w, "needs_review")).length;
+  // Releases already delivered in an earlier real digest (for the 🆕 marker when digests overlap).
+  const prior = must(await ctx.db.from("digest_runs").select("id").eq("is_test", false).eq("status", "sent").neq("window_key", w.key)
+    .gte("created_at", new Date(w.start.getTime() - DAY_MS).toISOString()), "prior digests") as any[];
+  const seenIds = new Set<string>();
+  if (prior.length) {
+    const di = must(await ctx.db.from("digest_items").select("release_id").in("digest_run_id", prior.map((p) => p.id)), "prior items") as any[];
+    for (const x of di) seenIds.add(x.release_id);
+  }
   const items: DigestRelease[] = rows.map((r) => {
     const rec = (r.recommendations ?? []).find((x: any) => x.preferences_hash === prefs.hash) ?? null;
     const ev = (r.release_evidence ?? []).find((e: any) => e.stance === "supports" && e.url && e.evidence_type !== "availability_current");
@@ -435,6 +452,7 @@ export async function buildDigest(ctx: Ctx, w: TimeWindow, isTest: boolean, degr
       season_number: r.season_number, episode_number: r.episode_number, episode_count: r.episode_count, available_date: r.available_date,
       available_at: r.available_at, date_basis: r.date_basis, genres: r.genres, original_language: r.original_language,
       runtime_min: r.runtime_min, watch_link: r.watch_link, evidence_url: ev?.url ?? null,
+      is_new: prior.length ? !seenIds.has(r.id) : undefined,
       rec: rec ? { verdict: rec.verdict, score: rec.score, reason: rec.reason, synopsis: rec.synopsis, is_fallback: rec.is_fallback } : null,
     };
   });
@@ -536,6 +554,24 @@ export async function runWeekly(ctx: Ctx, trigger: string) {
   if (now.getTime() - w.end.getTime() > WEEKLY_GRACE_MS) {
     return { status: "skipped", reason: `outside the Friday send window (window ${w.key})` };
   }
+  return runScheduledDigest(ctx, trigger, w);
+}
+
+/** Owner-requested extra digest at 18:30 IST today: rolling 7 days ending at today's 18:30 IST, one per day (key adhoc-YYYY-MM-DD). */
+export function adhocWindowFor(now: Date): TimeWindow | null {
+  const end = new Date(Date.parse(`${istDate(now)}T13:00:00Z`)); // 18:30 IST of today's IST date
+  if (now.getTime() < end.getTime() - 5 * 60_000 || now.getTime() - end.getTime() > WEEKLY_GRACE_MS) return null;
+  return { start: new Date(end.getTime() - 7 * DAY_MS), end, key: `adhoc-${istDate(end)}` };
+}
+
+export async function runAdhoc(ctx: Ctx, trigger: string) {
+  const w = adhocWindowFor(ctx.now());
+  if (!w) return { status: "skipped", reason: "not within an 18:30 IST send slot" };
+  return runScheduledDigest(ctx, trigger, w);
+}
+
+async function runScheduledDigest(ctx: Ctx, trigger: string, w: TimeWindow) {
+  const now = ctx.now();
   const prefs = await loadPreferences(ctx);
   if (!prefs.digest_enabled) return { status: "skipped", reason: "digest disabled in preferences" };
   const sent = must(await ctx.db.from("digest_runs").select("status").eq("window_key", w.key).eq("is_test", false).limit(1), "digest state") as any[];

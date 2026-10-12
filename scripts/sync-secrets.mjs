@@ -27,8 +27,10 @@ const map = {
   TELEGRAM_CHAT_ID: E.TELEGRAM_CHAT_ID,
   CRON_SECRET: E.CRON_SECRET,
   RADAR_SECRET_KEY: E.SUPABASE_SECRET_KEY,
-  LIVE_SEND_ENABLED: E.LIVE_SEND_ENABLED || "false",
+  // Owner-controlled flag: only pushed when explicitly present in .env, so a sync never silently changes it.
+  LIVE_SEND_ENABLED: E.LIVE_SEND_ENABLED,
   DASHBOARD_URL: E.DASHBOARD_URL,
+  OWNER_CODE: E.OWNER_CODE,
 };
 const lines = Object.entries(map).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`);
 const dir = mkdtempSync(join(tmpdir(), "radar-secrets-"));
@@ -37,7 +39,7 @@ try {
   writeFileSync(file, lines.join("\n") + "\n", { mode: 0o600 });
   execFileSync(process.platform === "win32" ? "npx.cmd" : "npx", ["supabase", "secrets", "set", "--env-file", file], { stdio: ["ignore", "ignore", "inherit"], shell: process.platform === "win32" });
   console.log(`Set ${lines.length} secrets: ${Object.keys(map).filter((k) => map[k]).join(", ")}`);
-  console.log(`LIVE_SEND_ENABLED=${map.LIVE_SEND_ENABLED}`);
+  console.log(map.LIVE_SEND_ENABLED ? `LIVE_SEND_ENABLED=${map.LIVE_SEND_ENABLED}` : "LIVE_SEND_ENABLED not in .env — left unchanged on Supabase");
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }

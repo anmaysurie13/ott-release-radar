@@ -77,7 +77,7 @@
 <text x="404" y="218" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a">pg_cron (UTC schedules)</text>
 <text x="404" y="237" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">Fri 13:00 UTC = 18:30 IST → weekly</text>
 <text x="404" y="256" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">retries 18:45 · 19:00 · 19:30 IST</text>
-<text x="404" y="275" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">daily 06:00 IST → India snapshot</text>
+<text x="404" y="275" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">daily 06:00 snapshot · 06:15 collect</text>
 <rect x="625" y="200" width="290" height="81" rx="10" fill="#d9f3ea" stroke="#2f9e7a" stroke-width="1.6"/>
 <text x="770" y="226" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a">pg_net POST /radar-cron?task=…</text>
 <text x="770" y="245" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">x-cron-secret read from Vault</text>
@@ -91,10 +91,10 @@
 <text x="770" y="360" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a">TMDB API (free)</text>
 <text x="770" y="379" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">metadata · posters · episode air dates</text>
 <text x="770" y="398" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">IN watch providers (data by JustWatch)</text>
-<rect x="625" y="442" width="290" height="81" rx="10" fill="#fff4d6" stroke="#d97706" stroke-width="1.6"/>
+<rect x="625" y="442" width="290" height="81" rx="10" fill="#d9f3ea" stroke="#2f9e7a" stroke-width="1.6"/>
 <text x="770" y="468" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a">Streaming Availability /changes</text>
-<text x="770" y="487" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">country=in · change_type=new</text>
-<text x="770" y="506" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">⚠ live test: 403 not subscribed</text>
+<text x="770" y="487" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">country=in · netflix, prime, hotstar</text>
+<text x="770" y="506" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">free plan · newest-first · daily</text>
 <rect x="625" y="552" width="290" height="81" rx="10" fill="#d9f3ea" stroke="#2f9e7a" stroke-width="1.6"/>
 <text x="770" y="578" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a">News discovery (evidence only)</text>
 <text x="770" y="597" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">Google News RSS (503 from cloud IPs)</text>
@@ -155,11 +155,11 @@
 <text x="1868" y="1390" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a">Rule-based fallback</text>
 <text x="1868" y="1409" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">labelled “AI unavailable”</text>
 <rect x="259" y="1480" width="290" height="62" rx="10" fill="#e6e0ff" stroke="#7c5cff" stroke-width="1.6"/>
-<text x="404" y="1506" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a">Naman / operator opens</text>
-<text x="404" y="1525" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">dashboard · magic-link sign-in</text>
+<text x="404" y="1506" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a">Naman (or anyone with the link)</text>
+<text x="404" y="1525" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">opens the dashboard · no sign-in</text>
 <rect x="625" y="1480" width="290" height="62" rx="10" fill="#d9f3ea" stroke="#2f9e7a" stroke-width="1.6"/>
-<text x="770" y="1506" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a">publishable key + RLS reads</text>
-<text x="770" y="1525" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">radar-api (allow-listed admins)</text>
+<text x="770" y="1506" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a">publishable key · read-only RLS</text>
+<text x="770" y="1525" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">edits via radar-api + owner code</text>
 <rect x="1723" y="1472" width="290" height="81" rx="10" fill="#dbeafb" stroke="#3b82c4" stroke-width="1.6"/>
 <text x="1868" y="1498" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a">React dashboard on Vercel</text>
 <text x="1868" y="1517" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">New This Week · top matches · filters</text>
@@ -177,7 +177,7 @@
 <text x="1868" y="1761" text-anchor="middle" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="500" fill="#0f172a">HTTP error → retried by next cron</text>
 <rect x="774" y="286" width="123.9" height="18" rx="4" fill="#ffffff" fill-opacity=".95"/><text x="779" y="299" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" font-weight="600" fill="#334155">fetch in parallel</text>
 <rect x="919" y="354.5" width="224.4" height="18" rx="4" fill="#ffffff" fill-opacity=".95"/><text x="924" y="367.5" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" font-weight="600" fill="#334155">facts · IN providers · air dates</text>
-<rect x="963" y="640" width="164.1" height="18" rx="4" fill="#ffffff" fill-opacity=".95"/><text x="968" y="653" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" font-weight="600" fill="#dc2626">403 → snapshot fallback</text>
+<rect x="963" y="640" width="211" height="18" rx="4" fill="#ffffff" fill-opacity=".95"/><text x="968" y="653" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" font-weight="600" fill="#dc2626">on 401/403 → snapshot fallback</text>
 <rect x="919" y="572.5" width="123.9" height="18" rx="4" fill="#ffffff" fill-opacity=".95"/><text x="924" y="585.5" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" font-weight="600" fill="#64748b">articles (claims)</text>
 <rect x="1285" y="406.5" width="117.2" height="18" rx="4" fill="#ffffff" fill-opacity=".95"/><text x="1290" y="419.5" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" font-weight="600" fill="#334155">first-seen dates</text>
 <rect x="1506" y="833.5" width="103.8" height="18" rx="4" fill="#ffffff" fill-opacity=".95"/><text x="1511" y="846.5" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" font-weight="600" fill="#64748b">matched claims</text>

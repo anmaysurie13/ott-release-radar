@@ -53,6 +53,7 @@ describe("digest builder", () => {
   it("episode formatting", () => {
     expect(formatEpisodes({ media_type: "tv", season_number: 2, episode_number: 3, episode_count: 3 })).toBe("S2 E3–E5");
     expect(formatEpisodes({ media_type: "tv", season_number: 2, episode_number: null, episode_count: 8 })).toBe("S2 · 8 episodes");
+    expect(formatEpisodes({ media_type: "tv", season_number: 24, episode_number: null, episode_count: 1 })).toBe("S24 · 1 episode");
   });
 });
 
@@ -64,7 +65,7 @@ describe("preference filter", () => {
     expect(passesPreferences({ ...base, original_language: "hi", spoken_languages: ["hi"] }, naman)).toBe(true);
     expect(passesPreferences({ ...base, original_language: "ta", spoken_languages: [] }, naman)).toBe(true);
     expect(passesPreferences({ ...base, original_language: "ml", spoken_languages: ["ml"] }, naman)).toBe(false); // Bigg Boss Malayalam
-    expect(passesPreferences({ ...base, original_language: "ko", spoken_languages: ["ko", "en"] }, naman)).toBe(true); // English listed as spoken
+    expect(passesPreferences({ ...base, original_language: "pl", spoken_languages: ["pl", "en"] }, naman)).toBe(false); // spoken English alone doesn't count
     expect(passesPreferences({ ...base, original_language: "ja", spoken_languages: ["ja"] }, naman)).toBe(false);
   });
   const prefs = { owner_name: "N", genres: [], languages: [], platforms: ["netflix", "prime"] as any, media_types: ["movie"] as any,

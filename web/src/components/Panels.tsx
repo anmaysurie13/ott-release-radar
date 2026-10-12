@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { callApi, supabase } from "../lib/supabase";
+import { callApi, setOwnerCode } from "../lib/supabase";
 import { LANG, PROVIDER_LABEL, RELEASE_LABEL, ago, fmtIst, langName, posterUrl, safeTelegramHtml } from "../lib/format";
 import type { DigestRun, MediaType, PipelineRun, Preferences, Provider, Release, ReleaseType, Source } from "../lib/types";
 
 // ---------------------------------------------------------------- filters
-export interface Filters { provider: Provider | "all"; genre: string; language: string; media: MediaType | "all"; rtype: ReleaseType | "all"; mine: boolean }
-export const EMPTY_FILTERS: Filters = { provider: "all", genre: "", language: "", media: "all", rtype: "all", mine: true };
+export interface Filters { provider: Provider | "all"; genre: string; language: string; media: MediaType | "all"; rtype: ReleaseType | "all"; mine: boolean; older: boolean }
+export const EMPTY_FILTERS: Filters = { provider: "all", genre: "", language: "", media: "all", rtype: "all", mine: true, older: false };
 
-export function FiltersBar({ f, set, genres, languages, total, shown, myLanguages }: {
-  f: Filters; set: (f: Filters) => void; genres: string[]; languages: string[]; total: number; shown: number; myLanguages: string[];
+export function FiltersBar({ f, set, genres, languages, total, shown, myLanguages, olderCount }: {
+  f: Filters; set: (f: Filters) => void; genres: string[]; languages: string[]; total: number; shown: number; myLanguages: string[]; olderCount: number;
 }) {
   const seg = <T extends string>(key: keyof Filters, opts: [T, string][]) => (
     <div className="seg" role="group" aria-label={String(key)}>
@@ -20,9 +20,13 @@ export function FiltersBar({ f, set, genres, languages, total, shown, myLanguage
   const dirty = JSON.stringify(f) !== JSON.stringify(EMPTY_FILTERS);
   return (
     <div className="filters" aria-label="Filters">
-      <label className="check" title="Only titles whose TMDB original or spoken language is in your saved languages">
+      <label className="check" title="Only titles whose original language (TMDB) is one of your saved languages">
         <input type="checkbox" checked={f.mine} onChange={(e) => set({ ...f, mine: e.target.checked })} />
         {myLanguages.map((l) => LANG[l] ?? l).join(" · ")} only
+      </label>
+      <label className="check" title="Older titles that were newly added to a platform this week (kept separate from new releases)">
+        <input type="checkbox" checked={f.older} onChange={(e) => set({ ...f, older: e.target.checked })} />
+        Older titles newly added ({olderCount})
       </label>
       {seg<Provider | "all">("provider", [["all", "All"], ["netflix", "Netflix"], ["prime", "Prime Video"], ["jiohotstar", "JioHotstar"]])}
       {seg<MediaType | "all">("media", [["all", "All"], ["movie", "Movies"], ["tv", "Series"]])}
@@ -48,43 +52,40 @@ export function FiltersBar({ f, set, genres, languages, total, shown, myLanguage
   );
 }
 
-// ---------------------------------------------------------------- auth
-export function SignIn() {
-  const [email, setEmail] = useState("");
-  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [err, setErr] = useState("");
-  if (!supabase) return null;
+// ---------------------------------------------------------------- owner unlock (no email sign-in)
+export function OwnerUnlock({ onUnlocked, compact = false }: { onUnlocked: () => void; compact?: boolean }) {
+  const [code, setCode] = useState("");
+  const [state, setState] = useState<"idle" | "checking" | "error">("idle");
   return (
     <div className="panel">
-      <h3>Sign in</h3>
-      <p className="hint">This dashboard is private to Naman. Enter your allow-listed email and we'll send a one-time sign-in link.</p>
+      {!compact && <h3>Owner tools</h3>}
+      <p className="hint">Anyone with the link can view. Changing preferences, reviewing, previewing or test-sending the digest needs the owner code.</p>
       <form className="row" onSubmit={async (e) => {
-        e.preventDefault(); setState("sending");
-        const { error } = await supabase!.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } });
-        if (error) { setErr(error.message); setState("error"); } else setState("sent");
+        e.preventDefault(); setState("checking");
+        try { await callApi("status", {}, code.trim()); setOwnerCode(code.trim()); setState("idle"); onUnlocked(); }
+        catch { setState("error"); }
       }}>
-        <label className="sr-only" htmlFor="email">Email</label>
-        <input id="email" className="input" style={{ maxWidth: 320 }} type="email" required placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <button className="btn primary" disabled={state === "sending"}>{state === "sending" ? "Sending…" : "Email me a sign-in link"}</button>
+        <label className="sr-only" htmlFor="owner-code">Owner code</label>
+        <input id="owner-code" className="input" style={{ maxWidth: 280 }} type="password" autoComplete="off" required placeholder="Owner code" value={code} onChange={(e) => setCode(e.target.value)} />
+        <button className="btn primary" disabled={state === "checking"}>{state === "checking" ? "Checking…" : "Unlock"}</button>
       </form>
-      {state === "sent" && <p className="banner info">Check your inbox for the magic link.</p>}
-      {state === "error" && <p className="banner error">{err}</p>}
+      {state === "error" && <p className="banner error">That code didn't work.</p>}
     </div>
   );
 }
 
 // ---------------------------------------------------------------- review queue (human checkpoint)
-export function ReviewQueue({ items, onDone, toast }: { items: Release[]; onDone: () => void; toast: (s: string) => void }) {
+export function ReviewQueue({ items, onDone, toast, canEdit }: { items: Release[]; onDone: () => void; toast: (s: string) => void; canEdit: boolean }) {
   if (!items.length) return <div className="empty"><div className="big">✅</div><h3>Nothing to review</h3><p>Every candidate this week was either verified or excluded automatically.</p></div>;
   return (
     <div className="form-grid">
       <p className="banner info">These came only from news articles (or had conflicting/missing dates). They are <b>not</b> in the dashboard or digest until you confirm them with a source you checked yourself.</p>
-      {items.map((r) => <ReviewItem key={r.id} r={r} onDone={onDone} toast={toast} />)}
+      {items.map((r) => <ReviewItem key={r.id} r={r} onDone={onDone} toast={toast} canEdit={canEdit} />)}
     </div>
   );
 }
 
-function ReviewItem({ r, onDone, toast }: { r: Release; onDone: () => void; toast: (s: string) => void }) {
+function ReviewItem({ r, onDone, toast, canEdit }: { r: Release; onDone: () => void; toast: (s: string) => void; canEdit: boolean }) {
   const hint = r.release_evidence.find((e) => e.evidence_type === "tmdb_digital_note")?.stated_date
     ?? r.release_evidence.find((e) => e.evidence_type === "news_article" && e.stated_date)?.stated_date ?? r.available_date ?? "";
   const [date, setDate] = useState(hint);
@@ -109,14 +110,14 @@ function ReviewItem({ r, onDone, toast }: { r: Release; onDone: () => void; toas
               {e.stated_date ? ` — states ${e.stated_date}` : ""}{e.stated_platform ? ` · ${e.stated_platform}` : ""}{e.quote ? ` — “${e.quote}”` : ""}</li>
           ))}
         </ul>
-        <div className="row">
+        {canEdit && <div className="row">
           <label className="sr-only" htmlFor={`d-${r.id}`}>India availability date</label>
           <input id={`d-${r.id}`} className="input" style={{ maxWidth: 170 }} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           <label className="sr-only" htmlFor={`n-${r.id}`}>Source you checked</label>
           <input id={`n-${r.id}`} className="input" style={{ flex: 1, minWidth: 200 }} placeholder="Source you checked (e.g. title page on the app)" value={note} onChange={(e) => setNote(e.target.value)} />
           <button className="btn primary sm" disabled={busy || !date || note.length < 5} onClick={() => act("confirm")}>Confirm</button>
           <button className="btn danger sm" disabled={busy} onClick={() => act("exclude")}>Exclude</button>
-        </div>
+        </div>}
       </div>
     </div>
   );
@@ -175,13 +176,13 @@ export function DigestPanel({ liveSend, toast }: { liveSend: boolean | null; toa
 const GENRE_OPTIONS = ["Thriller", "Science Fiction", "Indie Drama", "Drama", "Crime", "Mystery", "Action", "Comedy", "Romance", "Horror", "Documentary", "Animation", "Fantasy", "Reality"];
 const LANG_OPTIONS = ["hi", "en", "ta", "te", "ml", "kn", "bn", "mr", "ko", "ja"];
 
-export function PreferencesPanel({ prefs, onSaved, toast }: { prefs: Preferences; onSaved: () => void; toast: (s: string) => void }) {
+export function PreferencesPanel({ prefs, onSaved, toast, canEdit }: { prefs: Preferences; onSaved: () => void; toast: (s: string) => void; canEdit: boolean }) {
   const [p, setP] = useState<Preferences>(prefs);
   const [busy, setBusy] = useState(false);
   const toggle = <T,>(arr: T[], v: T) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
   const check = <T extends string>(key: keyof Preferences, v: T, label: string) => (
     <label className="check" key={v}>
-      <input type="checkbox" checked={(p[key] as T[]).includes(v)} onChange={() => setP({ ...p, [key]: toggle(p[key] as T[], v) })} /> {label}
+      <input type="checkbox" disabled={!canEdit} checked={(p[key] as T[]).includes(v)} onChange={() => setP({ ...p, [key]: toggle(p[key] as T[], v) })} /> {label}
     </label>
   );
   return (
@@ -189,13 +190,15 @@ export function PreferencesPanel({ prefs, onSaved, toast }: { prefs: Preferences
       e.preventDefault();
       if (!p.platforms.length || !p.media_types.length) { toast("Pick at least one platform and one content type"); return; }
       setBusy(true);
-      const { error } = await supabase!.from("preferences").update({
-        genres: p.genres, languages: p.languages, platforms: p.platforms, media_types: p.media_types, release_types: p.release_types,
-        include_older_additions: p.include_older_additions, notes: p.notes, digest_enabled: p.digest_enabled,
-      }).eq("id", 1);
-      setBusy(false);
-      toast(error ? error.message : "Preferences saved — new opinions are generated on the next run");
-      if (!error) onSaved();
+      try {
+        await callApi("save_preferences", { preferences: {
+          genres: p.genres, languages: p.languages, platforms: p.platforms, media_types: p.media_types, release_types: p.release_types,
+          include_older_additions: p.include_older_additions, notes: p.notes, digest_enabled: p.digest_enabled,
+        } });
+        toast("Preferences saved — new opinions are generated on the next run");
+        onSaved();
+      } catch (err) { toast((err as Error).message); }
+      finally { setBusy(false); }
     }}>
       <div><h3>{p.owner_name}'s preferences</h3><p className="hint">Used to filter platforms/types and to personalise AI opinions. Facts are never changed by preferences.</p></div>
       <fieldset><legend>Genres</legend><div className="checks">{GENRE_OPTIONS.map((g) => check("genres", g, g))}</div></fieldset>
@@ -204,13 +207,13 @@ export function PreferencesPanel({ prefs, onSaved, toast }: { prefs: Preferences
       <fieldset><legend>Content</legend><div className="checks">
         {check("media_types", "movie", "Movies")}{check("media_types", "tv", "Series")}
         {check("release_types", "new_title", "New titles")}{check("release_types", "new_season", "New seasons")}{check("release_types", "new_episode", "New episodes")}
-        <label className="check"><input type="checkbox" checked={p.include_older_additions} onChange={(e) => setP({ ...p, include_older_additions: e.target.checked })} /> Older titles newly added</label>
+        <label className="check"><input type="checkbox" disabled={!canEdit} checked={p.include_older_additions} onChange={(e) => setP({ ...p, include_older_additions: e.target.checked })} /> Older titles newly added</label>
       </div></fieldset>
       <fieldset><legend>Notes for the AI (optional)</legend>
-        <textarea className="input" rows={2} maxLength={500} value={p.notes ?? ""} onChange={(e) => setP({ ...p, notes: e.target.value || null })} placeholder="e.g. prefer limited series; no reality TV" />
+        <textarea className="input" disabled={!canEdit} rows={2} maxLength={500} value={p.notes ?? ""} onChange={(e) => setP({ ...p, notes: e.target.value || null })} placeholder="e.g. prefer limited series; no reality TV" />
       </fieldset>
-      <label className="check" style={{ width: "fit-content" }}><input type="checkbox" checked={p.digest_enabled} onChange={(e) => setP({ ...p, digest_enabled: e.target.checked })} /> Friday Telegram digest enabled</label>
-      <div><button className="btn primary" disabled={busy}>{busy ? "Saving…" : "Save preferences"}</button></div>
+      <label className="check" style={{ width: "fit-content" }}><input type="checkbox" disabled={!canEdit} checked={p.digest_enabled} onChange={(e) => setP({ ...p, digest_enabled: e.target.checked })} /> Friday Telegram digest enabled</label>
+      {canEdit ? <div><button className="btn primary" disabled={busy}>{busy ? "Saving…" : "Save preferences"}</button></div> : <p className="hint">Read-only — unlock with the owner code to edit.</p>}
     </form>
   );
 }

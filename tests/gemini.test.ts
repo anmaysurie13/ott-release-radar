@@ -42,6 +42,12 @@ describe("validateRecommendations", () => {
     expect(v.valid).toHaveLength(0);
     expect(v.invalid).toEqual(["r1"]);
   });
+  it("keeps the AI verdict but trims an over-long synopsis to two TMDB sentences", () => {
+    const long = "A detective in Mumbai hunts a killer. The case turns personal. Then more happens. And more.";
+    const v = validateRecommendations({ items: [{ ...good, synopsis: long }] }, [inp()], "m");
+    expect(v.valid[0].is_fallback).toBe(false);
+    expect(v.valid[0].synopsis).toBe("A detective in Mumbai hunts a killer. The case turns personal.");
+  });
   it("forces the no-synopsis text when TMDB has no overview", () => {
     const v = validateRecommendations({ items: [{ ...good, synopsis: "Made-up plot." }] }, [inp({ overview: null })], "m");
     expect(v.valid[0].synopsis).toBe(NO_SYNOPSIS);

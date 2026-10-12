@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Session } from "@supabase/supabase-js";
-import { callApi, supabase } from "./lib/supabase";
+import { callApi, getOwnerCode, setOwnerCode, supabase } from "./lib/supabase";
 import { ago, countdown, fmtIst, inRolling7, istDate, latestRec, nextDigest } from "./lib/format";
 import type { DigestRun, PipelineRun, Preferences, Release, Source } from "./lib/types";
 import { FIXTURE_DIGESTS, FIXTURE_PREFS, FIXTURE_RELEASES, FIXTURE_RUNS, FIXTURE_SOURCES } from "./lib/fixtures";
 import { type CardRelease, ReleaseCard, SkeletonGrid } from "./components/ReleaseCard";
-import { DigestPanel, EMPTY_FILTERS, type Filters, FiltersBar, PreferencesPanel, ReviewQueue, RunsPanel, SignIn, SourcesPanel } from "./components/Panels";
+import { DigestPanel, EMPTY_FILTERS, type Filters, FiltersBar, OwnerUnlock, PreferencesPanel, ReviewQueue, RunsPanel, SourcesPanel } from "./components/Panels";
 
 const FIXTURES = !supabase || new URLSearchParams(location.search).has("fixtures");
 /** Naman's saved defaults (Hindi, English, Tamil); replaced by the stored preferences when signed in as an admin. */
@@ -42,10 +41,8 @@ function groupForDisplay(rows: Release[]): CardRelease[] {
 }
 
 export default function App() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  /** private dashboard: checking → signedOut | denied | ok */
-  const [access, setAccess] = useState<"checking" | "signedOut" | "denied" | "ok">(FIXTURES ? "ok" : "checking");
+  /** owner tools unlocked with the owner code (verified server-side on every call) */
+  const [isAdmin, setIsAdmin] = useState(() => !!getOwnerCode());
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,28 +57,14 @@ export default function App() {
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 60_000); return () => clearInterval(t); }, []);
 
   useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => { setSession(data.session); if (!data.session) setAccess("signedOut"); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
-    return () => sub.subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (FIXTURES) return;
-    if (!supabase || !session) { setIsAdmin(false); setAccess("signedOut"); return; }
-    setAccess("checking");
-    supabase.from("app_admins").select("email").maybeSingle().then(({ data }) => { setIsAdmin(!!data); setAccess(data ? "ok" : "denied"); });
-  }, [session]);
-
-  useEffect(() => {
     if (!isAdmin) return;
-    callApi<{ live_send_enabled: boolean }>("status").then((s) => setLiveSend(s.live_send_enabled)).catch(() => setLiveSend(null));
+    callApi<{ live_send_enabled: boolean }>("status").then((s) => setLiveSend(s.live_send_enabled))
+      .catch(() => { setOwnerCode(null); setIsAdmin(false); setLiveSend(null); });
   }, [isAdmin]);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      if (!FIXTURES && !isAdmin) { setData(null); return; } // private: nothing is readable without an allow-listed session
       if (FIXTURES) {
         setData({ releases: FIXTURE_RELEASES, review: [], runs: FIXTURE_RUNS, digests: FIXTURE_DIGESTS, sources: FIXTURE_SOURCES, prefs: FIXTURE_PREFS });
         return;
@@ -96,7 +79,7 @@ export default function App() {
       ]);
       for (const r of [rel, runs, digests, sources]) if (r.error) throw new Error(r.error.message);
       let review: Release[] = [], prefs: Preferences | null = null;
-      if (isAdmin) {
+      {
         const [rv, pf] = await Promise.all([
           db.from("releases").select(REL_SELECT).eq("verification_status", "needs_review").order("last_checked_at", { ascending: false }).limit(60),
           db.from("preferences").select("*").eq("id", 1).single(),
@@ -111,7 +94,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -120,44 +103,27 @@ export default function App() {
   const languages = useMemo(() => [...new Set(week.map((r) => r.original_language).filter(Boolean) as string[])].sort(), [week]);
   const sortByScore = (a: Release, b: Release) => (latestRec(b)?.score ?? -1) - (latestRec(a)?.score ?? -1);
   const myLanguages = data?.prefs?.languages?.length ? data.prefs.languages : DEFAULT_LANGUAGES;
-  const langOk = (r: Release) => [r.original_language, ...(r.spoken_languages ?? [])].some((l) => !!l && myLanguages.includes(l));
+  const langOk = (r: Release) => !!r.original_language && myLanguages.includes(r.original_language);
   const filtered = useMemo(() => week.filter((r) =>
     (!filters.mine || langOk(r)) &&
+    (filters.older || filters.rtype === "older_addition" || r.release_type !== "older_addition") &&
     (filters.provider === "all" || r.provider === filters.provider) &&
     (filters.media === "all" || r.media_type === filters.media) &&
     (filters.rtype === "all" || r.release_type === filters.rtype) &&
     (!filters.genre || r.genres.includes(filters.genre)) &&
     (!filters.language || r.original_language === filters.language),
   ).sort(sortByScore), [week, filters, myLanguages]);
-  const top = useMemo(() => week.filter((r) => langOk(r) && latestRec(r)?.verdict === "watch").sort(sortByScore).slice(0, 10), [week, myLanguages]);
+  const top = useMemo(() => week.filter((r) => langOk(r) && r.release_type !== "older_addition" && latestRec(r)?.verdict === "watch").sort(sortByScore).slice(0, 10), [week, myLanguages]);
   const lastCollect = data?.runs.find((r) => /collect|weekly/.test(r.task));
   const next = nextDigest(now);
-  const degraded = lastCollect ? Object.entries(lastCollect.source_health ?? {}).filter(([k, v]) => /^(streaming_availability|gemini|snapshot_stale)/.test(k) && !/^ok/.test(v)) : [];
+  // Only real outages warrant a banner (a single auto-corrected AI item does not).
+  const degraded = lastCollect ? Object.entries(lastCollect.source_health ?? {}).filter(([k, v]) =>
+    (/^streaming_availability|^snapshot_stale/.test(k) && !/^ok/.test(v)) || (/^gemini/.test(k) && /^(failed|skipped)/.test(v))) : [];
 
   const feedback = isAdmin && !FIXTURES ? async (r: Release, decision: string) => {
-    const { error } = await supabase!.from("feedback").insert({ release_id: r.id, decision, created_by: session!.user.email!.toLowerCase() });
-    toast(error ? error.message : "Saved — thanks!");
+    try { await callApi("feedback", { release_id: r.id, decision }); toast("Saved — thanks!"); }
+    catch (e) { toast((e as Error).message); }
   } : undefined;
-
-  if (access !== "ok") {
-    return (
-      <main className="wrap" style={{ maxWidth: 560, paddingTop: "12vh" }}>
-        <div className="brand" style={{ marginBottom: 24 }}>
-          <img src="/radar.svg" alt="" style={{ width: 44, height: 44 }} />
-          <div><b style={{ fontSize: 24 }}>Release Radar</b><small style={{ display: "block", color: "var(--muted)" }}>Naman's private India OTT radar</small></div>
-        </div>
-        {access === "checking" && <div className="skel" style={{ height: 160 }} aria-busy="true" />}
-        {access === "signedOut" && <SignIn />}
-        {access === "denied" && (
-          <div className="panel">
-            <h3>This dashboard is private</h3>
-            <p className="hint">Signed in as {session?.user.email}, which is not on the allow-list. Ask the operator to add your email.</p>
-            <button className="btn" onClick={() => supabase!.auth.signOut()}>Sign out</button>
-          </div>
-        )}
-      </main>
-    );
-  }
 
   return (
     <>
@@ -174,7 +140,7 @@ export default function App() {
             <strong>{fmtIst(next, { weekday: "short", hour: "2-digit", minute: "2-digit" })}</strong>
             <span className="cd">· in {countdown(next, now)}</span>
           </div>
-          {session && <button className="btn sm ghost" onClick={() => supabase!.auth.signOut()}>Sign out</button>}
+          {isAdmin && <button className="btn sm ghost" onClick={() => { setOwnerCode(null); setIsAdmin(false); }}>Lock</button>}
         </div>
       </header>
 
@@ -188,16 +154,16 @@ export default function App() {
           <h1>New this week <span className="grad">in India</span></h1>
           <p className="sub">Verified Netflix, Prime Video and JioHotstar releases from the last 7 days ({fmtIst(new Date(now.getTime() - 7 * 86400e3), { day: "numeric", month: "short" })} – {fmtIst(now, { day: "numeric", month: "short" })} IST), matched to {data?.prefs?.owner_name ?? "Naman"}'s taste.</p>
           <div className="stats">
-            <div className="stat"><div className="k">Confirmed</div><div className="v">{loading ? "…" : week.length}</div><div className="s">titles / shows this week</div></div>
+            <div className="stat"><div className="k">Confirmed new</div><div className="v">{loading ? "…" : week.filter((r) => r.release_type !== "older_addition").length}</div><div className="s">+ {week.filter((r) => r.release_type === "older_addition").length} older titles newly added</div></div>
             <div className="stat"><div className="k">Top matches</div><div className="v">{loading ? "…" : top.length}</div><div className="s">AI verdict: Watch</div></div>
-            <div className="stat"><div className="k">Needs review</div><div className="v">{isAdmin ? data?.review.length ?? "…" : "—"}</div><div className="s">{isAdmin ? "unverified, not shown" : "sign in to review"}</div></div>
+            <div className="stat"><div className="k">Needs review</div><div className="v">{loading ? "…" : data?.review.length ?? 0}</div><div className="s">unverified · not in the digest</div></div>
             <div className="stat"><div className="k">Last check</div><div className="v" style={{ fontSize: 20, marginTop: 10 }}>{lastCollect ? ago(lastCollect.started_at, now) : "—"}</div>
               <div className="s">{lastCollect ? <span className={`status ${lastCollect.status}`}>{lastCollect.status}</span> : "no runs yet"}</div></div>
           </div>
         </section>
 
         <nav className="tabs" role="tablist" aria-label="Sections">
-          {([["week", "This week", week.length], ["review", "Review", isAdmin ? data?.review.length : undefined], ["digest", "Digest", undefined], ["prefs", "Preferences", undefined], ["runs", "Runs & sources", undefined]] as [Tab, string, number | undefined][])
+          {([["week", "This week", week.filter((r) => r.release_type !== "older_addition").length], ["review", "Review", data?.review.length], ["digest", "Digest", undefined], ["prefs", "Preferences", undefined], ["runs", "Runs & sources", undefined]] as [Tab, string, number | undefined][])
             .map(([id, label, n]) => (
               <button key={id} role="tab" className="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
                 {label}{n != null && n > 0 ? <span className="count">{n}</span> : null}
@@ -216,7 +182,7 @@ export default function App() {
               </>
             )}
             <div className="section-h"><h2>All verified releases</h2><span className="hint">Facts from TMDB/JustWatch &amp; verification sources</span></div>
-            <FiltersBar f={filters} set={setFilters} genres={genres} languages={languages} total={week.length} shown={filtered.length} myLanguages={myLanguages} />
+            <FiltersBar f={filters} set={setFilters} genres={genres} languages={languages} total={week.length} shown={filtered.length} myLanguages={myLanguages} olderCount={week.filter((r) => r.release_type === "older_addition" && (!filters.mine || langOk(r))).length} />
             {loading ? <SkeletonGrid /> : filtered.length ? (
               <div className="grid">{filtered.map((r, i) => <ReleaseCard key={r.id} r={r} index={i} onFeedback={feedback} />)}</div>
             ) : (
@@ -230,9 +196,15 @@ export default function App() {
           </>
         )}
 
-        {tab === "review" && (isAdmin ? <ReviewQueue items={data?.review ?? []} onDone={load} toast={toast} /> : FIXTURES ? <p className="banner info">Review queue is unavailable in fixture mode.</p> : <SignIn />)}
-        {tab === "digest" && (isAdmin ? <DigestPanel liveSend={liveSend} toast={toast} /> : FIXTURES ? <p className="banner info">Digest tools are unavailable in fixture mode.</p> : <SignIn />)}
-        {tab === "prefs" && (isAdmin && data?.prefs ? <PreferencesPanel prefs={data.prefs} onSaved={load} toast={toast} /> : FIXTURES ? <p className="banner info">Preferences are read-only in fixture mode.</p> : <SignIn />)}
+        {tab === "review" && (<>
+          {!isAdmin && !FIXTURES && <OwnerUnlock compact onUnlocked={() => setIsAdmin(true)} />}
+          <div style={{ marginTop: 16 }}><ReviewQueue items={data?.review ?? []} onDone={load} toast={toast} canEdit={isAdmin && !FIXTURES} /></div>
+        </>)}
+        {tab === "digest" && (FIXTURES ? <p className="banner info">Digest tools are unavailable in fixture mode.</p> : isAdmin ? <DigestPanel liveSend={liveSend} toast={toast} /> : <OwnerUnlock onUnlocked={() => setIsAdmin(true)} />)}
+        {tab === "prefs" && (<>
+          {!isAdmin && !FIXTURES && <OwnerUnlock compact onUnlocked={() => setIsAdmin(true)} />}
+          {data?.prefs && <div style={{ marginTop: 16 }}><PreferencesPanel key={String(isAdmin)} prefs={data.prefs} onSaved={load} toast={toast} canEdit={isAdmin && !FIXTURES} /></div>}
+        </>)}
         {tab === "runs" && <><RunsPanel runs={data?.runs ?? []} digests={data?.digests ?? []} /><SourcesPanel sources={data?.sources ?? []} /></>}
 
         <footer className="foot">

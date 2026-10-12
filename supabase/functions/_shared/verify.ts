@@ -104,6 +104,15 @@ export function verifyTitle(input: VerifyInput, window: TimeWindow, now: Date): 
   const rows: VerifiedRelease[] = [];
 
   // A. Streaming Availability changes
+  // Several seasons of one show added at the same moment = a back-catalogue drop, not a "new season".
+  const seasonBurst = new Map<string, number>();
+  for (const c of input.saChanges) if (c.item_type === "season" && c.provider === provider) {
+    const k = String(Math.floor(c.timestamp / 3600));
+    seasonBurst.set(k, (seasonBurst.get(k) ?? 0) + 1);
+  }
+  const hasShowLevel = input.saChanges.some((c) => c.provider === provider && c.item_type === "show");
+  const libraryDrop = (c: SaChange) => c.item_type === "season" && (seasonBurst.get(String(Math.floor(c.timestamp / 3600))) ?? 0) > 1;
+  let libraryRowAdded = false;
   for (const c of input.saChanges) {
     if (c.provider !== provider) continue;
     const at = new Date(c.timestamp * 1000);
@@ -112,7 +121,12 @@ export function verifyTitle(input: VerifyInput, window: TimeWindow, now: Date): 
     let release_type: ReleaseType;
     let season: number | null = null, episode: number | null = null;
     if (c.item_type === "episode") { release_type = "new_episode"; season = c.season ?? null; episode = c.episode ?? null; }
-    else if (c.item_type === "season") {
+    else if (c.item_type === "season" && c.season === 1 && hasShowLevel) continue; // same event as the show-level addition
+    else if (c.item_type === "season" && libraryDrop(c)) {
+      if (libraryRowAdded) continue;          // one title-level row for the whole drop
+      libraryRowAdded = true;
+      release_type = classifyTitle(facts, date);
+    } else if (c.item_type === "season") {
       season = c.season ?? null;
       release_type = season === 1 ? classifyTitle(facts, date) : "new_season";
     } else release_type = classifyTitle(facts, date);

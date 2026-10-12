@@ -29,12 +29,12 @@ const ch = (i) => colX(i) - COL_GAP / 2; // routing channel left of column i
 
 // [id, lane, col, dy, kind, lines]  kind: trigger|input|context|processing|output|warn|fail|human|decision
 const B = [
-  ["s1", 0, 0, 22, "trigger", ["pg_cron (UTC schedules)", "Fri 13:00 UTC = 18:30 IST → weekly", "retries 18:45 · 19:00 · 19:30 IST", "daily 06:00 IST → India snapshot"]],
+  ["s1", 0, 0, 22, "trigger", ["pg_cron (UTC schedules)", "Fri 13:00 UTC = 18:30 IST → weekly", "retries 18:45 · 19:00 · 19:30 IST", "daily 06:00 snapshot · 06:15 collect"]],
   ["s3", 0, 1, 30, "input", ["pg_net POST /radar-cron?task=…", "x-cron-secret read from Vault", "(Edge Function, shared-secret auth)"]],
   ["s4", 0, 3, 22, "processing", ["runWeekly()", "window [prev Fri 18:30, Fri 18:30) IST", "idempotent per window_key", "defers delivery if < 45 s budget left"]],
 
   ["d1", 1, 1, 14, "input", ["TMDB API (free)", "metadata · posters · episode air dates", "IN watch providers (data by JustWatch)"]],
-  ["d2", 1, 1, 122, "warn", ["Streaming Availability /changes", "country=in · change_type=new", "⚠ live test: 403 not subscribed"]],
+  ["d2", 1, 1, 122, "input", ["Streaming Availability /changes", "country=in · netflix, prime, hotstar", "free plan · newest-first · daily"]],
   ["d3", 1, 1, 232, "input", ["News discovery (evidence only)", "Google News RSS (503 from cloud IPs)", "+ 7 publisher RSS feeds"]],
   ["d4", 1, 2, 66, "context", ["Daily India snapshot", "TMDB discover × provider (365 days)", "first-seen diff vs last complete run"]],
   ["d5", 1, 2, 172, "context", ["Platform originals airing", "networks Netflix 213 · Prime 1024", "JioHotstar 8036 · Hotstar 3919"]],
@@ -55,8 +55,8 @@ const B = [
   ["g4", 4, 4, 14, "output", ["recommendations", "(AI opinion, stored apart from facts)"]],
   ["g3", 4, 4, 104, "fail", ["Rule-based fallback", "labelled “AI unavailable”"]],
 
-  ["w1", 5, 0, 30, "trigger", ["Naman / operator opens", "dashboard · magic-link sign-in"]],
-  ["w2", 5, 1, 30, "input", ["publishable key + RLS reads", "radar-api (allow-listed admins)"]],
+  ["w1", 5, 0, 30, "trigger", ["Naman (or anyone with the link)", "opens the dashboard · no sign-in"]],
+  ["w2", 5, 1, 30, "input", ["publishable key · read-only RLS", "edits via radar-api + owner code"]],
   ["w3", 5, 4, 22, "output", ["React dashboard on Vercel", "New This Week · top matches · filters", "review · preview · test send · runs"]],
 
   ["t1", 6, 3, 22, "processing", ["buildDigest(): group episodes ·", "sections · HTML-escape ·", "≤ 3 900-char chunks"]],
@@ -88,7 +88,7 @@ const E = [
   ["solid", "", 0, P("s3", "r"), P("s4", "l")],
   ["solid", "fetch in parallel", 1, P("s4", "b"), [P("s4", "b")[0], laneTop[1] - 14], [P("d1", "t")[0], laneTop[1] - 14], P("d1", "t")],
   ["solid", "facts · IN providers · air dates", 0, P("d1", "r"), [ch(3) - 12, P("d1", "r")[1]], [ch(3) - 12, P("v3", "l", -14)[1]], P("v3", "l", -14)],
-  ["fail", "403 → snapshot fallback", 2, P("d2", "r"), [ch(2) + 6, P("d2", "r")[1]], [ch(2) + 6, laneTop[2] + 10], [ch(3) + 12, laneTop[2] + 10], [ch(3) + 12, P("v3", "l", 14)[1]], P("v3", "l", 14)],
+  ["fail", "on 401/403 → snapshot fallback", 2, P("d2", "r"), [ch(2) + 6, P("d2", "r")[1]], [ch(2) + 6, laneTop[2] + 10], [ch(3) + 12, laneTop[2] + 10], [ch(3) + 12, P("v3", "l", 14)[1]], P("v3", "l", 14)],
   ["dashed", "articles (claims)", 0, P("d3", "r"), [ch(3) - 4, P("d3", "r")[1]], [ch(3) - 4, P("v1", "l")[1]], P("v1", "l")],
   ["solid", "first-seen dates", 0, P("d4", "r"), [ch(3) + 4, P("d4", "r")[1]], [ch(3) + 4, P("v3", "l")[1]], P("v3", "l")],
   ["solid", "originals", 0, P("d5", "r"), [ch(3) + 4, P("d5", "r")[1]]],

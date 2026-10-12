@@ -169,3 +169,31 @@ describe("news articles are never proof", () => {
     expect(r.evidence.find((e) => e.evidence_type === "news_article")?.stance).toBe("conflicts");
   });
 });
+
+describe("Streaming Availability back-catalogue drops", () => {
+  it("many seasons of an old show added at once → one older_addition row, not N new seasons", () => {
+    const tv = facts({ media_type: "tv", tmdb_id: 37854, release_date: "1999-10-20", available_in: ["netflix"] });
+    const drops = [1, 2, 3, 11, 26].map((s) => sa({ item_type: "season", show_type: "series", season: s, tmdb_key: "tv/37854", timestamp: ts("2026-10-12T05:33:00Z") }));
+    const out = verifyTitle({ facts: tv, provider: "netflix", saChanges: drops, episodes: [], claims: [] }, w, now);
+    expect(out).toHaveLength(1);
+    expect(out[0].release_type).toBe("older_addition");
+  });
+  it("a single new season of a running show stays new_season", () => {
+    const tv = facts({ media_type: "tv", tmdb_id: 255752, release_date: "2023-09-01", available_in: ["netflix"] });
+    const [r] = verifyTitle({ facts: tv, provider: "netflix", saChanges: [sa({ item_type: "season", show_type: "series", season: 2, tmdb_key: "tv/255752" })], episodes: [], claims: [] }, w, now);
+    expect(r.release_type).toBe("new_season");
+  });
+});
+
+describe("Streaming Availability show + season-1 pair", () => {
+  it("a new show and its season 1 added together produce one row", () => {
+    const tv = facts({ media_type: "tv", tmdb_id: 4242, release_date: "2026-10-01", available_in: ["jiohotstar"] });
+    const t = ts("2026-10-11T10:00:00Z");
+    const out = verifyTitle({ facts: tv, provider: "jiohotstar", episodes: [], claims: [], saChanges: [
+      sa({ provider: "jiohotstar", item_type: "show", show_type: "series", tmdb_key: "tv/4242", timestamp: t }),
+      sa({ provider: "jiohotstar", item_type: "season", show_type: "series", season: 1, tmdb_key: "tv/4242", timestamp: t }),
+    ] }, w, now);
+    expect(out).toHaveLength(1);
+    expect(out[0].release_type).toBe("new_title");
+  });
+});

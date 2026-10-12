@@ -2,7 +2,7 @@
 
 A personalised dashboard and Friday Telegram digest of **verified** new releases on **Netflix, Prime Video and JioHotstar in India**. It's built for one viewer (Naman: Thriller, Sci-Fi, Indie Drama; Hindi, English, Tamil).
 
-- **Dashboard (private to Naman — magic-link sign-in, allow-listed emails only):** https://ott-release-radar-six.vercel.app
+- **Dashboard (public, read-only — no sign-in; edits need the owner code from `.env` `OWNER_CODE`):** https://ott-release-radar-six.vercel.app
 - **Digest:** every Friday 18:30 IST via Telegram. Scheduled sends are **off** (`LIVE_SEND_ENABLED=false`) until the owner approves.
 - **Docs:** [component map](docs/component-map.md) · [nine checks](docs/nine-checks.md) · [source feasibility](docs/feasibility.md)
 
@@ -19,7 +19,7 @@ A personalised dashboard and Friday Telegram digest of **verified** new releases
 | Verification | rules + confidence thresholds, window capped at "now" | `_shared/verify.ts` |
 | AI | Gemini (server-side) for article extraction + opinions, with strict validation and rule-based fallback | `_shared/gemini.ts` |
 | Data | Postgres with RLS; facts / evidence / opinions / runs / deliveries in separate tables | `supabase/migrations/*` |
-| Dashboard | React + Vite on Vercel, **private**: every table is RLS-restricted to allow-listed admins (anon gets 401); admin actions via `radar-api` | `web/` |
+| Dashboard | React + Vite on Vercel. Public read-only (RLS: SELECT only, browsers can't write). Preferences, review, preview, test send and feedback go through `radar-api` with the owner code | `web/` |
 | Delivery | Telegram Bot API, HTML, ≤ 3 900-char chunks, per-chunk idempotency | `_shared/telegram.ts` |
 
 ### Schedule (UTC; IST = UTC+05:30)
@@ -30,6 +30,8 @@ A personalised dashboard and Friday Telegram digest of **verified** new releases
 | `radar-snapshot-prefriday` | `45 12 * * 5` | Fri 18:15 |
 | `radar-weekly` | `0 13 * * 5` | **Fri 18:30** |
 | `radar-weekly-retry-1/2/3` | `15 13`, `30 13`, `0 14` (Fri) | 18:45, 19:00, 19:30 |
+| `radar-collect-daily` | `45 0 * * *` | daily 06:15 (captures each day's Streaming Availability changes) |
+| `radar-adhoc-1012/1013` (+ retries) | `0 13 12 10 *`, `0 13 13 10 *` | owner-requested extra digests Mon 12 & Tue 13 Oct 2026, 18:30 (date-guarded) |
 
 ### Duplicate-send protection
 
@@ -113,17 +115,15 @@ All CLIs are used via `npx`. Log in first: `npx supabase login`, `npx vercel log
    npx vercel deploy --prod
    ```
    Set Supabase Auth `site_url` and redirect URLs to the Vercel URL; this repo uses `supabase config push`.
-7. **Admins:**
-   ```bash
-   node scripts/ops.mjs add-admin naman@example.com owner
-   ```
+7. **Owner code:** `OWNER_CODE` in `.env` (generated; pushed as an Edge secret). Share it only with Naman; it unlocks edits in the dashboard.
 8. **Go live** (owner approval required): set `LIVE_SEND_ENABLED=true` in `.env`, then run `node scripts/sync-secrets.mjs`.
 
 ## Credentials (minimum)
 
 | Variable | Where it lives | Why |
 |---|---|---|
-| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | browser + server | public API endpoint; RLS allows reads only to allow-listed admins |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | browser + server | public API endpoint; RLS allows read-only access |
+| `OWNER_CODE` | Edge secret (+ shared with Naman) | unlocks dashboard edits via `radar-api` |
 | `SUPABASE_SECRET_KEY` | server only (`RADAR_SECRET_KEY` Edge secret, local ops) | pipeline writes |
 | `TMDB_READ_TOKEN` | Edge secret | metadata, posters, India providers |
 | `RAPIDAPI_KEY` | Edge secret | Streaming Availability (needs free plan subscription) |

@@ -26,3 +26,11 @@ Rule: a failed **kill switch** stops the build · a failed **sizing** check shri
 - The Telegram digest goes to Naman's channel and now opens with what is new on **all three apps** (e.g. "Netflix 6 · Prime Video — · JioHotstar 4").
 - **Test send approved and done:** one TEST-labelled message delivered (Telegram message id 3, HTTP 200, 1 attempt, `delivery_logs.status = sent`). Scheduled sends remain off (`LIVE_SEND_ENABLED=false`).
 - Streaming Availability re-tested with the same RapidAPI key: still **403 not subscribed**, so check 03 is unchanged.
+
+## Update — Streaming Availability live (2026-10-12, 14:50 IST)
+
+- **Check 03 → PASS.** The owner subscribed the RapidAPI key to Streaming Availability's free Basic plan (RapidAPI shows "Cancel Plan" on Basic). Live: `/countries/in` lists `netflix`, `prime`, `hotstar` (subscription); `/changes?country=in&change_type=new` returns India additions with timestamps and TMDB ids. The first collect took 400 changes in 16 requests and confirmed 233 releases (38 new + 161 older titles newly added in the 7-day view). Quota headers: 1,000/month; a daily collect uses ≈ 16 requests.
+- **Check 04 → PASS (provisional).** The live digest preview now includes real new titles (e.g. *Less of a Stranger*, *The Doomies*, *LEGO Star Wars: The Mandalorian*, *Who Is Martin Mull?*) across all three apps, 4 Watch verdicts, in 2 Telegram messages. Re-assess after Naman's feedback.
+- **Owner decisions:** the dashboard is public read-only with no email sign-in; edits need the owner code. Extra digests are requested for Mon 12 Oct and Tue 13 Oct at 18:30 IST, plus the regular Friday digest.
+- **Live sends:** `LIVE_SEND_ENABLED` is still `false`. The agent's attempt to switch it on was blocked by the coding assistant's safety policy, so the owner flips it (see README "Go live").
+- Fixes from live data: the language filter now uses the original language only; a new show plus its season 1 count as one release; back-catalogue season drops count as "older addition"; synopses are capped at two TMDB sentences.

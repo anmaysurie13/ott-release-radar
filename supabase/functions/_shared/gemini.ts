@@ -255,6 +255,10 @@ export function validateRecommendations(raw: unknown, inputs: RecInput[], model:
       ["watch", "maybe", "skip"].includes(it.verdict) && bandFor(score) === it.verdict &&
       reason.length >= 3 && reason.length <= 280 && !/https?:\/\//i.test(reason) && !DATE_LIKE.test(reason);
     if (!inp.overview?.trim()) synopsis = NO_SYNOPSIS;
+    // "two-line" synopsis: if the model ran long, fall back to the first two sentences of the TMDB overview
+    if (synopsis !== NO_SYNOPSIS && (synopsis.length > 240 || (synopsis.match(/[.!?](\s|$)/g)?.length ?? 1) > 2)) {
+      synopsis = twoLineSynopsis(inp.overview);
+    }
     const overviewNums = new Set(numbersIn(inp.overview ?? ""));
     const synOk = synopsis === NO_SYNOPSIS ||
       (synopsis.length >= 10 && synopsis.length <= 320 && !/https?:\/\//.test(synopsis) &&
