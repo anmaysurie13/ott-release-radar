@@ -56,8 +56,8 @@ export function SignIn() {
   if (!supabase) return null;
   return (
     <div className="panel">
-      <h3>Sign in to manage</h3>
-      <p className="hint">Preferences, the review queue, digest preview and test send are limited to allow-listed accounts. Everyone else sees confirmed releases only.</p>
+      <h3>Sign in</h3>
+      <p className="hint">This dashboard is private to Naman. Enter your allow-listed email and we'll send a one-time sign-in link.</p>
       <form className="row" onSubmit={async (e) => {
         e.preventDefault(); setState("sending");
         const { error } = await supabase!.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } });

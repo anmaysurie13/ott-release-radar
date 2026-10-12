@@ -3,8 +3,9 @@
 //   POST /radar-cron?task=weekly     Friday 18:30 IST collect → verify → recommend → digest → Telegram (idempotent)
 //   POST /radar-cron?task=collect    operator: re-run collection for the upcoming window (never sends)
 //   POST /radar-cron?task=preview    operator: build next digest text (never sends, nothing stored)
+//   POST /radar-cron?task=test_send&confirm=SEND%20TEST   operator: one TEST-labelled Telegram message
 // Add &wait=1 to run synchronously (manual ops checks).
-import { buildDigest, runCollect, runSnapshot, runWeekly, upcomingWindow } from "../_shared/pipeline.ts";
+import { buildDigest, runCollect, runDeliver, runSnapshot, runWeekly, upcomingWindow } from "../_shared/pipeline.ts";
 import { background, json, makeCtx, timingSafeEqual } from "../_shared/server.ts";
 
 Deno.serve(async (req) => {
@@ -23,6 +24,11 @@ Deno.serve(async (req) => {
   // operator checks — never send Telegram messages
   else if (task === "collect") work = runCollect(ctx, upcomingWindow(new Date()), "manual", "manual_collect");
   else if (task === "preview") work = buildDigest(ctx, upcomingWindow(new Date()), false).then((d) => ({ chunks: d.chunks, items: d.items.length }));
+  // operator: one clearly-labelled TEST message (owner-approved); requires explicit confirmation, throttled to 1 per 2 min
+  else if (task === "test_send") {
+    if (url.searchParams.get("confirm") !== "SEND TEST") return json({ error: "confirm=SEND TEST required" }, 400);
+    work = runDeliver(ctx, upcomingWindow(new Date()), { isTest: true, trigger: "manual" });
+  }
   else return json({ error: "unknown task" }, 400);
 
   if (url.searchParams.get("wait") === "1") {

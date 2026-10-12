@@ -2,7 +2,7 @@
 
 A personalised dashboard and Friday Telegram digest of **verified** new releases on **Netflix, Prime Video and JioHotstar in India**. It's built for one viewer (Naman: Thriller, Sci-Fi, Indie Drama; Hindi, English, Tamil).
 
-- **Dashboard:** https://ott-release-radar-six.vercel.app
+- **Dashboard (private to Naman — magic-link sign-in, allow-listed emails only):** https://ott-release-radar-six.vercel.app
 - **Digest:** every Friday 18:30 IST via Telegram. Scheduled sends are **off** (`LIVE_SEND_ENABLED=false`) until the owner approves.
 - **Docs:** [component map](docs/component-map.md) · [nine checks](docs/nine-checks.md) · [source feasibility](docs/feasibility.md)
 
@@ -19,7 +19,7 @@ A personalised dashboard and Friday Telegram digest of **verified** new releases
 | Verification | rules + confidence thresholds, window capped at "now" | `_shared/verify.ts` |
 | AI | Gemini (server-side) for article extraction + opinions, with strict validation and rule-based fallback | `_shared/gemini.ts` |
 | Data | Postgres with RLS; facts / evidence / opinions / runs / deliveries in separate tables | `supabase/migrations/*` |
-| Dashboard | React + Vite on Vercel; publishable key only; admin actions via `radar-api` (allow-list) | `web/` |
+| Dashboard | React + Vite on Vercel, **private**: every table is RLS-restricted to allow-listed admins (anon gets 401); admin actions via `radar-api` | `web/` |
 | Delivery | Telegram Bot API, HTML, ≤ 3 900-char chunks, per-chunk idempotency | `_shared/telegram.ts` |
 
 ### Schedule (UTC; IST = UTC+05:30)
@@ -123,7 +123,7 @@ All CLIs are used via `npx`. Log in first: `npx supabase login`, `npx vercel log
 
 | Variable | Where it lives | Why |
 |---|---|---|
-| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | browser + server | public API endpoint; RLS restricts data |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | browser + server | public API endpoint; RLS allows reads only to allow-listed admins |
 | `SUPABASE_SECRET_KEY` | server only (`RADAR_SECRET_KEY` Edge secret, local ops) | pipeline writes |
 | `TMDB_READ_TOKEN` | Edge secret | metadata, posters, India providers |
 | `RAPIDAPI_KEY` | Edge secret | Streaming Availability (needs free plan subscription) |

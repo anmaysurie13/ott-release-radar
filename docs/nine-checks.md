@@ -19,3 +19,10 @@ Rule: a failed **kill switch** stops the build · a failed **sizing** check shri
 
 - No kill switch failed outright. **03 is conditional**: the owner approved the documented fallback (snapshot diff + platform-original air dates) while the Streaming Availability subscription is pending.
 - **Not production-ready yet.** Two things must happen first: (1) a dated India source for new movies (SA free plan, or ≥ 1 week of snapshots), and (2) owner approval to set `LIVE_SEND_ENABLED=true`. Until then, scheduled runs collect, verify and build the digest but **do not send**.
+
+## Update — owner decisions (2026-10-12)
+
+- The dashboard is **private to Naman**: migration `20261012000600_private_dashboard.sql` removes all anonymous reads. Live check: anon gets HTTP 401 on every table, and the site shows only the sign-in gate. **Pending:** Naman's email for `app_admins`.
+- The Telegram digest goes to Naman's channel and now opens with what is new on **all three apps** (e.g. "Netflix 6 · Prime Video — · JioHotstar 4").
+- **Test send approved and done:** one TEST-labelled message delivered (Telegram message id 3, HTTP 200, 1 attempt, `delivery_logs.status = sent`). Scheduled sends remain off (`LIVE_SEND_ENABLED=false`).
+- Streaming Availability re-tested with the same RapidAPI key: still **403 not subscribed**, so check 03 is unchanged.

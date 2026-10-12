@@ -46,7 +46,7 @@ const B = [
   ["v5", 2, 2, 331, "fail", ["needs_review / excluded", "missing · conflicting · future ·", "stale · provider mismatch"]],
   ["v6", 2, 2, 170, "human", ["HUMAN REVIEW", "Naman (dashboard Review tab)", "confirms date + names source"]],
 
-  ["b1", 3, 2, 22, "context", ["preferences (hi · en · ta hard filter)", "app_admins · RLS: anon reads confirmed"]],
+  ["b1", 3, 2, 22, "context", ["preferences (hi · en · ta hard filter)", "app_admins · RLS: admin-only (private)"]],
   ["b2", 3, 3, 22, "processing", ["saveReleases(): dedupe_key", "+ ±3-day merge · release_evidence", "candidates · sources (last_checked)"]],
   ["b3", 3, 4, 22, "output", ["pipeline_runs · digest_runs", "(UNIQUE per window) · delivery_logs"]],
 

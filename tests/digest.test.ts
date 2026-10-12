@@ -25,6 +25,7 @@ describe("digest builder", () => {
     const text = blocks.join("\n\n");
     expect(text).toContain("Fixture &lt;Thriller&gt; &amp; Co");
     expect(text).toContain("⭐ <b>Top matches</b>");
+    expect(text).toContain("📺 New on your apps: Netflix <b>4</b> · Prime Video — · JioHotstar —");
     expect(text).toContain("(rules)");
     expect(text).toContain("Skipped as poor matches: Skip One");
     expect(text).toContain("Older titles newly added");

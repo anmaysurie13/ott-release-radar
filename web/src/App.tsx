@@ -44,6 +44,8 @@ function groupForDisplay(rows: Release[]): CardRelease[] {
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  /** private dashboard: checking → signedOut | denied | ok */
+  const [access, setAccess] = useState<"checking" | "signedOut" | "denied" | "ok">(FIXTURES ? "ok" : "checking");
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,14 +61,16 @@ export default function App() {
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    supabase.auth.getSession().then(({ data }) => { setSession(data.session); if (!data.session) setAccess("signedOut"); });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => sub.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (!supabase || !session) { setIsAdmin(false); return; }
-    supabase.from("app_admins").select("email").maybeSingle().then(({ data }) => setIsAdmin(!!data));
+    if (FIXTURES) return;
+    if (!supabase || !session) { setIsAdmin(false); setAccess("signedOut"); return; }
+    setAccess("checking");
+    supabase.from("app_admins").select("email").maybeSingle().then(({ data }) => { setIsAdmin(!!data); setAccess(data ? "ok" : "denied"); });
   }, [session]);
 
   useEffect(() => {
@@ -77,6 +81,7 @@ export default function App() {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
+      if (!FIXTURES && !isAdmin) { setData(null); return; } // private: nothing is readable without an allow-listed session
       if (FIXTURES) {
         setData({ releases: FIXTURE_RELEASES, review: [], runs: FIXTURE_RUNS, digests: FIXTURE_DIGESTS, sources: FIXTURE_SOURCES, prefs: FIXTURE_PREFS });
         return;
@@ -133,6 +138,26 @@ export default function App() {
     const { error } = await supabase!.from("feedback").insert({ release_id: r.id, decision, created_by: session!.user.email!.toLowerCase() });
     toast(error ? error.message : "Saved — thanks!");
   } : undefined;
+
+  if (access !== "ok") {
+    return (
+      <main className="wrap" style={{ maxWidth: 560, paddingTop: "12vh" }}>
+        <div className="brand" style={{ marginBottom: 24 }}>
+          <img src="/radar.svg" alt="" style={{ width: 44, height: 44 }} />
+          <div><b style={{ fontSize: 24 }}>Release Radar</b><small style={{ display: "block", color: "var(--muted)" }}>Naman's private India OTT radar</small></div>
+        </div>
+        {access === "checking" && <div className="skel" style={{ height: 160 }} aria-busy="true" />}
+        {access === "signedOut" && <SignIn />}
+        {access === "denied" && (
+          <div className="panel">
+            <h3>This dashboard is private</h3>
+            <p className="hint">Signed in as {session?.user.email}, which is not on the allow-list. Ask the operator to add your email.</p>
+            <button className="btn" onClick={() => supabase!.auth.signOut()}>Sign out</button>
+          </div>
+        )}
+      </main>
+    );
+  }
 
   return (
     <>

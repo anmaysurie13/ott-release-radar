@@ -121,6 +121,13 @@ export function buildDigestBlocks(d: DigestInput): { blocks: string[]; sections:
   blocks.push(header);
 
   const grouped = groupEpisodes(d.items);
+  // What's new on each of the three apps (verified, after language/platform preferences).
+  const perApp = (Object.keys(PROVIDER_LABEL) as Provider[])
+    .map((p) => {
+      const n = grouped.filter((i) => i.provider === p && (d.includeOlder || i.release_type !== "older_addition")).length;
+      return `${PROVIDER_LABEL[p]} ${n ? `<b>${n}</b>` : "—"}`;
+    }).join(" · ");
+  blocks.push(`📺 New on your apps: ${perApp}`);
   const fresh = sortItems(grouped.filter((i) => i.release_type !== "older_addition"));
   const older = sortItems(grouped.filter((i) => i.release_type === "older_addition"));
   const top = fresh.filter((i) => i.rec?.verdict === "watch");
