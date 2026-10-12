@@ -110,7 +110,7 @@ All CLIs are used via `npx`. Log in first: `npx supabase login`, `npx vercel log
    ```bash
    node scripts/ops.mjs call snapshot --wait
    ```
-6. **Dashboard:** run `npx vercel link` in `web/`, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to Vercel production env, then:
+6. **Dashboard:** the Vercel project is connected to this GitHub repo, so every push to `main` deploys to production automatically. The root `vercel.json` builds `web/`. Manual alternative: run `npx vercel link` in `web/`, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to Vercel production env, then:
    ```bash
    npx vercel deploy --prod
    ```
