@@ -152,8 +152,8 @@ export function buildDigestBlocks(d: DigestInput): { blocks: string[]; sections:
     for (const r of more) { blocks.push(itemBlock(r, ++n)); sections.push({ id: r.id, section: "more" }); }
   }
   if (skipped.length) {
-    const names = skipped.slice(0, 8).map((s) => `${e(s.title)} (${PROVIDER_LABEL[s.provider]})`).join(", ");
-    blocks.push(`⏭ Skipped as poor matches: ${names}${skipped.length > 8 ? ` and ${skipped.length - 8} more` : ""}`);
+    const uniq = [...new Set(skipped.map((s) => `${e(s.title)} (${PROVIDER_LABEL[s.provider]})`))];
+    blocks.push(`⏭ Skipped as poor matches: ${uniq.slice(0, 8).join(", ")}${uniq.length > 8 ? ` and ${uniq.length - 8} more` : ""}`);
     for (const r of skipped) sections.push({ id: r.id, section: "skipped" });
   }
   if (d.includeOlder && older.length) {
