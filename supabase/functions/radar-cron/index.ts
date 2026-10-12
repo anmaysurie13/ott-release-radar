@@ -21,7 +21,8 @@ Deno.serve(async (req) => {
   let work: Promise<unknown>;
   if (task === "snapshot") work = runSnapshot(ctx, trigger);
   else if (task === "weekly") work = runWeekly(ctx, trigger);
-  else if (task === "adhoc") work = runAdhoc(ctx, trigger); // owner-requested extra 18:30 IST digests (date-guarded cron jobs)
+  // owner-requested extra digests: 18:30 IST via date-guarded cron jobs, or immediately with &now=1 (same per-day key → never twice)
+  else if (task === "adhoc") work = runAdhoc(ctx, url.searchParams.get("now") === "1" ? "manual" : trigger, url.searchParams.get("now") === "1");
   // operator checks — never send Telegram messages
   else if (task === "collect") work = runCollect(ctx, upcomingWindow(new Date()), "manual", "manual_collect");
   else if (task === "preview") work = buildDigest(ctx, upcomingWindow(new Date()), false).then((d) => ({ chunks: d.chunks, items: d.items.length }));
@@ -39,7 +40,8 @@ Deno.serve(async (req) => {
     console.log(`[radar-cron:${task}]`, JSON.stringify(r).slice(0, 2000));
     // Collect used most of this invocation's wall-clock → continue delivery in a fresh invocation (idempotent).
     if ((task === "weekly" || task === "adhoc") && (r as { status?: string })?.status === "deferred") {
-      await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/radar-cron?task=${task}`, {
+      const qs = new URLSearchParams(url.searchParams); qs.delete("wait"); // keep task + flags (e.g. now=1)
+      await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/radar-cron?${qs}`, {
         method: "POST", headers: { "x-cron-secret": secret, "content-type": "application/json" }, body: "{}",
         signal: AbortSignal.timeout(5000),
       }).catch(() => { /* the 18:45 IST retry cron covers this */ });

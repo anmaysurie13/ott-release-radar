@@ -558,14 +558,16 @@ export async function runWeekly(ctx: Ctx, trigger: string) {
 }
 
 /** Owner-requested extra digest at 18:30 IST today: rolling 7 days ending at today's 18:30 IST, one per day (key adhoc-YYYY-MM-DD). */
-export function adhocWindowFor(now: Date): TimeWindow | null {
+export function adhocWindowFor(now: Date, immediate = false): TimeWindow | null {
+  // immediate: owner asked to send today's one-off digest now → rolling 7 days ending now, same per-day key (no double send at 18:30)
+  if (immediate) return { start: new Date(now.getTime() - 7 * DAY_MS), end: now, key: `adhoc-${istDate(now)}` };
   const end = new Date(Date.parse(`${istDate(now)}T13:00:00Z`)); // 18:30 IST of today's IST date
   if (now.getTime() < end.getTime() - 5 * 60_000 || now.getTime() - end.getTime() > WEEKLY_GRACE_MS) return null;
   return { start: new Date(end.getTime() - 7 * DAY_MS), end, key: `adhoc-${istDate(end)}` };
 }
 
-export async function runAdhoc(ctx: Ctx, trigger: string) {
-  const w = adhocWindowFor(ctx.now());
+export async function runAdhoc(ctx: Ctx, trigger: string, immediate = false) {
+  const w = adhocWindowFor(ctx.now(), immediate);
   if (!w) return { status: "skipped", reason: "not within an 18:30 IST send slot" };
   return runScheduledDigest(ctx, trigger, w);
 }
